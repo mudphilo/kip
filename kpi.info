@@ -1,2 +1,7 @@
 name = KPI
 description = Internal Analytics Dashboard For Hivisasa
+
+core = 7.x
+package Hivisasa
+
+version = 7.x-1.0
