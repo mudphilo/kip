@@ -1,0 +1,94 @@
+<?php
+function sasa_kpi_menu()
+{
+    $items['admin/config/kpi']=array(
+      'title'=>'Key Perfomance Parameters',
+      'description'=>'Key perfomance parameters',
+      'page callback'=>'drupal_get_form',
+      'page arguments'=>array('kpi_filter_form'),
+      'access callback' => 'user_access',
+      'access arguments' => array('access kpi'),
+      'type' => MENU_NORMAL_ITEM,
+      'menu_name'=>'management', 
+    );
+  return $items;
+}    
+
+/*
+$status article status eigther published or unplished
+$star  and $end this are date range in time stamp
+*/
+function kpi_filter_form()
+{
+  $form = array();
+  $form['kpi'] = array(
+    '#title' => t('Key Perfomance Idicators'),
+    '#description' => t('update hostels and zones which they belong'),
+    '#weight' => '0',
+    '#type' => 'fieldset',
+    '#collapsible' => '1',
+    '#collapsed' => '0',
+    );
+  // get VID of counties vocabularies
+  $vid=db_query('SELECT vid FROM {taxonomy_vocabulary} WHERE machine_name = :name', array(':name' =>'kenya_counties'))->fetchField();
+// list all counties and store in arrays
+  $kenya_counties=array();
+  if ($terms = taxonomy_get_tree($vid)) 
+      {
+          foreach ($terms as $term) 
+            {
+                $kenya_counties[$term->tid]=$term->name;
+            }
+      }
+  $form['kpi']['county'] = array(
+    '#required' => '1',
+    '#key_type_toggled' => '1',
+    '#description' => t('Please select county to filter'),
+    '#default_value' => 'active',
+    '#weight' => '-10',
+    '#type' => 'select',
+    '#options'=>$kenya_counties,
+    '#multiple_toggle' => '1',
+    '#title' => t('County Name'),
+  );
+  $form['kpi']['start']= array(
+    '#type' => 'date_popup',
+    '#date_format' => 'm-d-Y',
+    '#default_value' =>date("m-d-Y",date('U')),
+    '#date_year_range' =>'-1:+0',
+    '#date_label_position' => 'within',
+    '#title' => t('Select starting date'),
+    '#weight' => '-9',    
+);
+  $form['kpi']['end']= array(
+    '#type' => 'date_popup',
+    '#date_format' => 'm-d-Y',
+    '#default_value' =>date("m-d-Y",date('U')),
+    '#date_year_range' =>'-1:+0',
+    '#date_label_position' => 'within',
+    '#title' => t('Select ending date'),
+    '#weight' => '-8',    
+  );
+  $form['search']['submit'] = array(
+    '#type' => 'submit',
+    '#weight' => '-7',
+    '#value' => t('Search')
+  );
+return $form;
+}
+function kpi_filter_form_submit($form, &$form_state)
+  {
+      drupal_set_message(t("Returned results %c",array('%c'=>get_submitted_articles($form_state['values']['start'],$form_state['values']['end'],$form_state['values']['county'],1))));    
+  }   
+function get_submitted_articles($from,$to,$county,$status)
+  {
+      $range=array(strtotime($from),strtotime($to));
+        $query = new EntityFieldQuery();
+        $query->entityCondition('entity_type', 'node')
+          ->entityCondition('bundle', 'article')
+          ->propertyCondition('status',1)
+          ->propertyCondition('created',$range,'BETWEEN')
+          ->fieldCondition('field_article_county', 'tid',$county, '=');
+        return $query->count()->execute();      
+  }
+        
