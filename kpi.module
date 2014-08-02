@@ -23,7 +23,7 @@ function kpi_filter_form()
   $form = array();
   $form['kpi'] = array(
     '#title' => t('Key Perfomance Idicators'),
-    '#description' => t('update hostels and zones which they belong'),
+    '#description' => t('Flter out the perfomance range that you want'),
     '#weight' => '0',
     '#type' => 'fieldset',
     '#collapsible' => '1',
