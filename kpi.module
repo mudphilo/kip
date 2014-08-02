@@ -88,7 +88,7 @@ return $form;
 }
 function kpi_filter_form_submit($form, &$form_state)
   {
-      drupal_set_message(t("Returned results %c",array('%c'=>get_submitted_articles($form_state['values']['start'],$form_state['values']['end'],$form_state['values']['county'],$status))));    
+      drupal_set_message(t("Returned results %c",array('%c'=>get_submitted_articles($form_state['values']['start'],$form_state['values']['end'],$form_state['values']['county'],$form_state['values']['status']))));    
   }   
 function get_submitted_articles($from,$to,$county,$status)
   {
