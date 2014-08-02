@@ -88,7 +88,9 @@ return $form;
 }
 function kpi_filter_form_submit($form, &$form_state)
   {
-      drupal_set_message(t("Returned results %c",array('%c'=>get_submitted_articles($form_state['values']['start'],$form_state['values']['end'],$form_state['values']['county'],$form_state['values']['status']))));    
+      drupal_set_message(t("Number of submitted articles %c",array('%c'=>get_submitted_articles($form_state['values']['start'],$form_state['values']['end'],$form_state['values']['county'],$form_state['values']['status']))));    
+      drupal_set_message(t("Total contributors %c",array('%c'=>get_contributors($form_state['values']['start'],$form_state['values']['end'],$form_state['values']['county'],$form_state['values']['status']))));    
+
   }   
 function get_submitted_articles($from,$to,$county,$status)
   {
@@ -102,4 +104,22 @@ function get_submitted_articles($from,$to,$county,$status)
           ->fieldCondition('field_article_county','tid',$county,'=');
         return $query->count()->execute();      
   }
-        
+function get_contributors($from,$to,$county,$status)
+  {
+
+      $range=array(strtotime($from),strtotime($to));
+      $users=array();
+      $a=db_query('SELECT DISTINCT uid,type FROM {node} WHERE created BETWEEN :start AND :end ',array(':start'=>strtotime($from),':end'=>strtotime($to)));
+      foreach($a as $a)
+          {
+            array_push($users,$a->uid);
+          }    
+        $query = new EntityFieldQuery();
+        $query->entityCondition('entity_type', 'node')
+          ->entityCondition('bundle', 'article')
+          ->propertyCondition('uid',$users,'IN')
+          ->propertyCondition('status',$status)
+          ->propertyCondition('created',$range,'BETWEEN')
+          ->fieldCondition('field_article_county','tid',$county,'=');
+        return $query->count()->execute();      
+  }        
