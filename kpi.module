@@ -51,6 +51,16 @@ function kpi_filter_form()
     '#multiple_toggle' => '1',
     '#title' => t('County Name'),
   );
+  $form['kpi']['status'] = array(
+    '#required' => '1',
+    '#key_type_toggled' => '1',
+    '#description' => t('Please select article status'),
+    '#weight' => '-10',
+    '#type' => 'select',
+    '#options'=>array('1'=>'Published','0'=>'Unpublished'),
+    '#multiple_toggle' => '1',
+    '#title' => t('Article Status'),
+  );  
   $form['kpi']['start']= array(
     '#type' => 'date_popup',
     '#date_format' => 'm-d-Y',
@@ -78,17 +88,18 @@ return $form;
 }
 function kpi_filter_form_submit($form, &$form_state)
   {
-      drupal_set_message(t("Returned results %c",array('%c'=>get_submitted_articles($form_state['values']['start'],$form_state['values']['end'],$form_state['values']['county'],1))));    
+      drupal_set_message(t("Returned results %c",array('%c'=>get_submitted_articles($form_state['values']['start'],$form_state['values']['end'],$form_state['values']['county'],$status))));    
   }   
 function get_submitted_articles($from,$to,$county,$status)
   {
+
       $range=array(strtotime($from),strtotime($to));
         $query = new EntityFieldQuery();
         $query->entityCondition('entity_type', 'node')
           ->entityCondition('bundle', 'article')
-          ->propertyCondition('status',1)
+          ->propertyCondition('status',$status)
           ->propertyCondition('created',$range,'BETWEEN')
-          ->fieldCondition('field_article_county', 'tid',$county, '=');
+          ->fieldCondition('field_article_county','tid',$county,'=');
         return $query->count()->execute();      
   }
         
