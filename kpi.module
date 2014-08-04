@@ -1,4 +1,5 @@
 <?php
+/* hook_menu */
 function sasa_kpi_menu()
 {
     $items['admin/config/kpi']=array(
@@ -13,10 +14,10 @@ function sasa_kpi_menu()
     );
   return $items;
 }    
+/* create a form so that the user will be able to filter out resulsts
 
-/*
 $status article status eigther published or unplished
-$star  and $end this are date range in time stamp
+$start  and $end this are date range in time stamp
 */
 function kpi_filter_form()
 {
@@ -29,7 +30,7 @@ function kpi_filter_form()
     '#collapsible' => '1',
     '#collapsed' => '0',
     );
-  // get VID of counties vocabularies
+  // get VID of counties from vocabularies
   $vid=db_query('SELECT vid FROM {taxonomy_vocabulary} WHERE machine_name = :name', array(':name' =>'kenya_counties'))->fetchField();
 // list all counties and store in arrays
   $kenya_counties=array();
@@ -88,13 +89,22 @@ return $form;
 }
 function kpi_filter_form_submit($form, &$form_state)
   {
+
       drupal_set_message(t("Number of submitted articles %c",array('%c'=>get_submitted_articles($form_state['values']['start'],$form_state['values']['end'],$form_state['values']['county'],$form_state['values']['status']))));    
+      drupal_set_message(t("Total new contributors %c",array('%c'=>get_unique_contributors($form_state['values']['start'],$form_state['values']['end'],$form_state['values']['county'],$form_state['values']['status']))));    
       drupal_set_message(t("Total contributors %c",array('%c'=>get_contributors($form_state['values']['start'],$form_state['values']['end'],$form_state['values']['county'],$form_state['values']['status']))));    
 
-  }   
+  }
+/*
+this functions returns the total number of submitted articles filterd by county and date range
+*/     
 function get_submitted_articles($from,$to,$county,$status)
   {
 
+/* 
+//this too works but it will throw an error if $from and $to dates are the same because of using 'BETWEEN' operator  
+
+
       $range=array(strtotime($from),strtotime($to));
         $query = new EntityFieldQuery();
         $query->entityCondition('entity_type', 'node')
@@ -102,24 +112,91 @@ function get_submitted_articles($from,$to,$county,$status)
           ->propertyCondition('status',$status)
           ->propertyCondition('created',$range,'BETWEEN')
           ->fieldCondition('field_article_county','tid',$county,'=');
-        return $query->count()->execute();      
+        $v= $query->count()->execute();      
+        drupal_set_message(t('Total submitted articles %v',array('%v'=>$v)));  
+*/
+    // build query
+      $query= db_select('node','n')
+      // filter only articles
+      ->condition('n.type', 'article')
+      // filter by the given date range, using BETWEEN throws an error, better using >$from and ,$to  
+      ->condition('n.created',strtotime($to),'<')
+      ->condition('n.created',strtotime($from),'>')
+      // filter by article status
+      ->condition('n.status',$status);
+      // JOIN node table with county data attached to the node
+      $query->join('field_data_field_article_county','c', 'c.entity_id=n.nid');
+      // filter by article county 
+      $query->condition('c.field_article_county_tid',$county);
+      // count query
+      $result=$query->countQuery()
+      // run the query and return it
+      ->execute()->fetchField();
+      return $result;
+
   }
+/*
+this functions returns the total number of contributors filterd by county and date range
+*/  
 function get_contributors($from,$to,$county,$status)
   {
 
-      $range=array(strtotime($from),strtotime($to));
-      $users=array();
-      $a=db_query('SELECT DISTINCT uid,type FROM {node} WHERE created BETWEEN :start AND :end ',array(':start'=>strtotime($from),':end'=>strtotime($to)));
-      foreach($a as $a)
-          {
-            array_push($users,$a->uid);
-          }    
-        $query = new EntityFieldQuery();
-        $query->entityCondition('entity_type', 'node')
-          ->entityCondition('bundle', 'article')
-          ->propertyCondition('uid',$users,'IN')
-          ->propertyCondition('status',$status)
-          ->propertyCondition('created',$range,'BETWEEN')
-          ->fieldCondition('field_article_county','tid',$county,'=');
-        return $query->count()->execute();      
-  }        
+  $a=db_query('SELECT count (DISTINCT n.uid) as cn 
+   /* select dinstinct UID from node*/ 
+   FROM node AS n 
+   /* ADD join to get the county which the node belongs */
+   JOIN field_data_field_article_county AS c ON n.nid=c.entity_id 
+   WHERE 
+   /* filter by the given dates */
+   n.created BETWEEN :start AND :end 
+   AND
+   /* select only node for thr given county */
+    c.field_article_county_tid=:county
+  AND
+  /* SELECT ONLY NODES HAVING THE STATUS SAME AS THE GIVEN STATUS */  
+   n.status=:status ',
+  /* ARRAY OF ARGUMENTS */ 
+   array(':start'=>strtotime($from),':end'=>strtotime($to),':county'=>$county,':status'=>$status));
+
+  $count=0; // holds total contributors
+      foreach ($a as $a) 
+        {
+           $count=$a->cn;   
+        }
+      return $count;
+
+  }
+  /*
+this functions returns the total number of new users i.e (users who have posted only one article) filterd by county and date range
+*/
+function get_unique_contributors($from,$to,$county,$status) 
+  {
+
+      // build query
+      $query= db_select('node','n')
+      // a field must be selected due to having and group by condition
+      ->fields('n',array('nid','uid'))
+      // select only articles      
+      ->condition('n.type', 'article')
+      // filter by article status
+      ->condition('n.status',$status)
+      // without group by having condition wont apply, also group by the field (i.e uid) which shall be used in having condition
+      ->groupBy('n.uid');
+      // Count how many article each user has
+      $query->addExpression('COUNT (n.uid)','ucount');
+      // get how many users have written only one article
+      $query->havingCondition('ucount',1);   
+      // JOIN node table with county data attached to the node
+      $query->join('field_data_field_article_county','c', 'c.entity_id=n.nid');
+      // filter by article county 
+      $query->condition('c.field_article_county_tid',$county);
+      // filter by date created 
+      $query->condition('n.created',strtotime($to),'<');
+      $query->condition('n.created',strtotime($from),'>');
+      // count query
+      $result=$query->countQuery()
+      // run the query and fetch result as single value and return it
+
+      ->execute()->fetchField();
+      return $result;
+  }
